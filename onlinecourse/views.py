@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.http import HttpResponseRedirect
-# <HINT> Import any new Models here
+from .models import Course, Enrollment, Lesson, Question, Choice, Submission # Додано Question, Choice, Submission
 from .models import Course, Enrollment
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404, render, redirect
@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.views import generic
 from django.contrib.auth import login, logout, authenticate
 import logging
-# Get an instance of a logger
+
 logger = logging.getLogger(__name__)
 # Create your views here.
 
@@ -103,15 +103,36 @@ def enroll(request, course_id):
     return HttpResponseRedirect(reverse(viewname='onlinecourse:course_details', args=(course.id,)))
 
 
-# <HINT> Create a submit view to create an exam submission record for a course enrollment,
-# you may implement it based on following logic:
-         # Get user and course object, then get the associated enrollment object created when the user enrolled the course
-         # Create a submission object referring to the enrollment
-         # Collect the selected choices from exam form
-         # Add each selected choice object to the submission object
-         # Redirect to show_exam_result with the submission id
-#def submit(request, course_id):
 
+def submit(request, course_id):
+    course = get_object_or_404(Course, pk=course_id)
+    user = request.user
+    
+    enrollment = Enrollment.objects.get(user=user, course=course)
+    
+    submission = Submission.objects.create(enrollment=enrollment)
+    
+    selected_choice_ids = extract_answers(request)
+    
+    for choice_id in selected_choice_ids:
+        choice = get_object_or_404(Choice, pk=choice_id)
+        submission.choices.add(choice)
+    
+    return HttpResponseRedirect(reverse(viewname='onlinecourse:show_exam_result', args=(course.id, submission.id)))
+
+def show_exam_result(request, course_id, submission_id):
+    context = {}
+    course = get_object_or_404(Course, pk=course_id)
+    submission = get_object_or_404(Submission, pk=submission_id)
+    
+    # Отримуємо всі питання курсу
+    questions = Question.objects.filter(course=course)
+    
+    # Рахуємо результати (логіка може залежати від твоїх моделей, але загальний принцип такий)
+    context['course'] = course
+    context['submission'] = submission
+    
+    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
 
 # An example method to collect the selected choices from the exam form from the request object
 def extract_answers(request):
